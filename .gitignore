@@ -1,0 +1,16 @@
+venv/
+
+pycache/
+
+*.pyc
+
+.env
+
+*.log
+
+ollama.log
+
+postgres_data/
+
+*.swp
+*.swo
