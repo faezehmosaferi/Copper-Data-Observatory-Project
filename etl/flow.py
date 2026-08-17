@@ -2,17 +2,27 @@ import sys
 from dotenv import load_dotenv
 load_dotenv()
 
-from extract import fetch_alphavantage, fetch_fred, fetch_yahoofinance, fetch_fred_series
+from extract import fetch_alphavantage, fetch_fred, fetch_yahoofinance, fetch_fred_series, scrape_caixin_pmi
 from transform import parse_alphavantage_latest, parse_fred_latest, parse_fred_all, transform_yf_copper_price
 from load import get_conn, ensure_table, insert_price, insert_macro_ind, load_to_copper_prices, load_to_macro_indicators
+from read_excel import  build_tuples
 
 FRED_SERIES = {
     "FEDFUNDS": "Federal Funds Rate",
+    "PIORECRUSDM":"Global price of ore",
     "CPIAUCSL": "CPI Inflation",
     "INDPRO": "Industrial Production",
     "CSUSHPISA": "Housing Price Index",
     "MANEMP": "Manufacturing Employment",
+    "XTIMVA01CNM657S" : "Imported commodities for china",
+    "COCHNZ335" : "Electrical equipment china",
+    "COCHNZ333" : "Machinary manufacturing  china",
+    "CCRETT01CNM661N" : "REER china"
 }
+UNITS = { "Percent", "USD/Ton", "index 1982-1984=100", "index 2017=100", "index 2000=100",
+         "thousands of persons", "growth rate over previous period", "index 2012-Jun=100", "index 2012-Jun=100",
+         "index 2015=100"
+        }
 
 def main():
     conn = get_conn()
@@ -29,21 +39,34 @@ def main():
 
     # FRED
 
-        raw_fred = fetch_fred()
+#        raw_fred = fetch_fred()
+        copper_records = fetch_fred()
+#        caixin_pmi_records = scrape_caixin_pmi()
+        lme_copper_records = build_tuples()
+        fred_series_records = []
+        for series_id, unit in zip(FRED_SERIES.keys(), UNITS):
+            fred_series_records.extend(fetch_fred_series(series_id, unit))
 
-        raw_fred_series = []
-        for series_id in FRED_SERIES.keys():
-            raw_fred_series.extend(fetch_fred_series(series_id))
-        if raw_fred:
-            records_fred = parse_fred_all(raw_fred)               
-            if records_fred and raw_fred_series:
+#        if raw_fred:
+#            records_fred = parse_fred_all(raw_fred)               
+        if copper_records and fred_series_records:
                ensure_table(conn)
-               load_to_copper_prices(conn, 'copper_prices', records_fred)
-               load_to_macro_indicators(conn, 'macro_indicators', raw_fred_series)
+#               load_to_copper_prices(conn, 'copper_prices',  copper_records)
+               load_to_macro_indicators(conn, 'macro_indicators', copper_records)
+               load_to_macro_indicators(conn, 'macro_indicators', fred_series_records)
+               load_to_macro_indicators(conn, 'macro_indicators', lme_copper_records) 
+#               if caixin_pmi_records:
+#                   load_to_macro_indicators(conn, 'macro_indicators', caixin_pmi_records)
+
+
 #               insert_price(conn, records_fred)
 #               insert_macro_ind=(conn, raw_fred_series)
-               print(f"[FRED] inserted {len(records_fred)} records")
-               print(f"[FRED] inserted {len(records_fred)} macro-ind records")
+               print(f"[FRED] inserted {len(copper_records)} records")
+               print(f"[FRED] inserted {len(fred_series_records)} macro-ind records")
+               print(f"[westmetal.com] inserted {len(lme_copper_records)} lme_copper records")
+#               print(f"[investing.com] inserted {len(caixin_pmi_records)} caixin_pmi_records")
+
+
 
      # yahoofinance
 

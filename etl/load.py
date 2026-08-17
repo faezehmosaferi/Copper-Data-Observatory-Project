@@ -17,19 +17,20 @@ CREATE TABLE IF NOT EXISTS macro_indicators (
     series_id VARCHAR(30) NOT NULL,
     value NUMERIC,
     source TEXT,
+    unit TEXT,
     PRIMARY KEY (date, series_id)
 );
 """
 
 INSERT_PRICE = """
-INSERT INTO copper_prices (recorded_at, price_usd, unit, source)
+INSERT INTO copper_prices (date, series_id, price_usd, unit, source)
 VALUES (%(recorded_at)s, %(price_usd)s, %(unit)s, %(source)s)
 ON CONFLICT (recorded_at, source) DO UPDATE
 SET price_usd = EXCLUDED.price_usd,
     source = EXCLUDED.source;
 """
 INSERT_MACRO_IND = """
-INSERT INTO macro_indicators (date, series_id, value)
+INSERT INTO macro_indicators (date, series_id, value, unit, source)
 VALUES %s
 ON CONFLICT (date, series_id)
 DO UPDATE SET value = EXCLUDED.value;
@@ -51,17 +52,19 @@ def ensure_table(conn):
 
 
 def load_to_copper_prices(conn, table_name, records):
-    placeholders = ",".join(["%s"] * len(records[0]))
-    cols = ",".join(records[0].keys())
-    query = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
+    placeholders = ",".join(["%s"] * len(records[0]))    
+    cols = "date, PCOPPUSDM, value, source"
+#    cols = ",".join(records[0].keys())
+    query = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders}) ON CONFLICT (date) DO UPDATE SET value = EXCLUDED.value;"
     with conn.cursor() as cur:
-        cur.executemany(query, [tuple(r.values()) for r in records])
+#        cur.executemany(query, [tuple(r.values()) for r in records])
+        cur.executemany(query, records) 
     conn.commit()
 
 def load_to_macro_indicators(conn, table_name, records):
     placeholders = ",".join(["%s"] * len(records[0]))
-    cols = "date, series_id, value, source"
-    query = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders}) ON CONFLICT DO NOTHING"
+    cols = "date, series_id, value, unit, source"
+    query = f"INSERT INTO {table_name} ({cols}) VALUES ({placeholders}) ON CONFLICT (date, series_id) DO UPDATE SET value = EXCLUDED.value;"
     with conn.cursor() as cur:
         cur.executemany(query, records)
     conn.commit()
